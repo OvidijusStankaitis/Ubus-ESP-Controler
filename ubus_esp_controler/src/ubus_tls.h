@@ -3,10 +3,15 @@
 
 #include <libubus.h>
 
-struct device {
-    char port[64];
-    int vid;
-    int pid;
+#define DEVICE_MAX 8
+#define ESP_PID 0xEA60
+#define ESP_VID 0x10C4
+
+struct device
+{
+    char port[16];
+    char pid[9];
+    char vid[9];
 };
 
 extern struct blob_buf b;

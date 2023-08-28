@@ -6,19 +6,19 @@
 struct blob_buf b;
 
 static int ubus_method_devices(struct ubus_context *ctx, struct ubus_object *obj,
-                            struct ubus_request_data *req, const char *method,
-                            struct blob_attr *msg);
+                               struct ubus_request_data *req, const char *method,
+                               struct blob_attr *msg);
 static int ubus_method_on(struct ubus_context *ctx, struct ubus_object *obj,
-                       struct ubus_request_data *req, const char *method,
-                       struct blob_attr *msg);
+                          struct ubus_request_data *req, const char *method,
+                          struct blob_attr *msg);
 static int ubus_method_off(struct ubus_context *ctx, struct ubus_object *obj,
-                        struct ubus_request_data *req, const char *method,
-                        struct blob_attr *msg);
+                           struct ubus_request_data *req, const char *method,
+                           struct blob_attr *msg);
 
 const struct ubus_method ubus_methods[] = {
-    { .name = "devices", .handler = ubus_method_devices },
-    { .name = "on", .handler = ubus_method_on },
-    { .name = "off", .handler = ubus_method_off },
+    {.name = "devices", .handler = ubus_method_devices},
+    {.name = "on", .handler = ubus_method_on},
+    {.name = "off", .handler = ubus_method_off},
 };
 
 struct ubus_object_type device_object_type =
@@ -31,36 +31,59 @@ struct ubus_object device_object = {
     .n_methods = ARRAY_SIZE(ubus_methods),
 };
 
-void init_ubus_methods(struct ubus_context *ctx) {
+void init_ubus_methods(struct ubus_context *ctx)
+{
     ubus_add_object(ctx, &device_object);
 }
 
-
 static int ubus_method_devices(struct ubus_context *ctx, struct ubus_object *obj,
-                            struct ubus_request_data *req, const char *method,
-                            struct blob_attr *msg) {
+                               struct ubus_request_data *req, const char *method,
+                               struct blob_attr *msg)
+{
     struct sp_port **ports;
     int i;
     blob_buf_init(&b, 0);
+    int count = 0;
+    struct device dev[DEVICE_MAX];
 
-    if (get_esp_devices(&ports) < 0) {
+    if (get_esp_devices(&ports) < 0)
+    {
         blobmsg_add_string(&b, "error", "Failed to get device list");
-    } else {
+    }
+    else
+    {
         void *array = blobmsg_open_array(&b, "devices");
-        
-        for (i = 0; ports[i]; i++) {
-            struct device dev;
-            strcpy(dev.port, sp_get_port_name(ports[i]));
-            // Removed the incorrect line
-            sp_get_port_usb_vid_pid(ports[i], &dev.vid, &dev.pid);  
 
-            void *table = blobmsg_open_table(&b, NULL);
-            blobmsg_add_string(&b, "port", dev.port);
-            blobmsg_add_u32(&b, "vendor id", dev.vid);
-            blobmsg_add_u32(&b, "product id", dev.pid);
-            blobmsg_close_table(&b, table);
+        for (i = 0; ports[i]; i++)
+        {
+            struct sp_port *port = ports[i];
+            int usb_vid, usb_pid;
+
+            char *port_name = sp_get_port_name(port);
+            sp_get_port_usb_vid_pid(port, &usb_vid, &usb_pid);
+            if (usb_pid == ESP_PID && usb_vid == ESP_VID && count < DEVICE_MAX)
+            {
+                char pid[9];
+                char vid[9];
+
+                sprintf(pid, "%04X", usb_pid);
+                sprintf(vid, "%04X", usb_vid);
+
+                strncpy(dev[count].port, port_name, sizeof(dev[count].port) - 1);
+                strncpy(dev[count].pid, pid, sizeof(dev[count].pid) - 1);
+                strncpy(dev[count].vid, vid, sizeof(dev[count].vid) - 1);
+
+                void *table = blobmsg_open_table(&b, NULL);
+
+                blobmsg_add_string(&b, "port", dev[count].port);
+                blobmsg_add_string(&b, "product id", dev[count].pid);
+                blobmsg_add_string(&b, "vendor id", dev[count].vid);
+                
+                blobmsg_close_table(&b, table);
+                count++;
+            }
         }
-        
+
         blobmsg_close_array(&b, array);
         sp_free_port_list(ports);
     }
@@ -69,35 +92,41 @@ static int ubus_method_devices(struct ubus_context *ctx, struct ubus_object *obj
     return 0;
 }
 
-static int send_command_to_device(const char *port_name, const char *action, int pin) {
+static int send_command_to_device(const char *port_name, const char *action, int pin)
+{
     char command[64];
     snprintf(command, sizeof(command), "{\"action\": \"%s\", \"pin\": %d}", action, pin);
     return send_esp_command(port_name, command);
 }
 
 const struct blobmsg_policy ubus_method_policy[] = {
-    { .name = "port", .type = BLOBMSG_TYPE_STRING },
-    { .name = "pin", .type = BLOBMSG_TYPE_INT32 },
+    {.name = "port", .type = BLOBMSG_TYPE_STRING},
+    {.name = "pin", .type = BLOBMSG_TYPE_INT32},
 };
 
 static int ubus_method_on(struct ubus_context *ctx, struct ubus_object *obj,
-                       struct ubus_request_data *req, const char *method,
-                       struct blob_attr *msg) {
+                          struct ubus_request_data *req, const char *method,
+                          struct blob_attr *msg)
+{
     struct blob_attr *tb[2];
     const char *port_name;
     int pin;
-    
+
     blobmsg_parse(ubus_method_policy, ARRAY_SIZE(ubus_method_policy), tb, blob_data(msg), blob_len(msg));
-    if (!tb[0] || !tb[1]) {
+    if (!tb[0] || !tb[1])
+    {
         return UBUS_STATUS_INVALID_ARGUMENT;
     }
-    
+
     port_name = blobmsg_get_string(tb[0]);
     pin = blobmsg_get_u32(tb[1]);
-    
-    if (send_command_to_device(port_name, "on", pin) < 0) {
+
+    if (send_command_to_device(port_name, "on", pin) < 0)
+    {
         blobmsg_add_string(&b, "error", "Failed to send ON command");
-    } else {
+    }
+    else
+    {
         blobmsg_add_string(&b, "result", "Successfully sent ON command");
     }
 
@@ -106,27 +135,31 @@ static int ubus_method_on(struct ubus_context *ctx, struct ubus_object *obj,
 }
 
 static int ubus_method_off(struct ubus_context *ctx, struct ubus_object *obj,
-                        struct ubus_request_data *req, const char *method,
-                        struct blob_attr *msg) {
+                           struct ubus_request_data *req, const char *method,
+                           struct blob_attr *msg)
+{
     struct blob_attr *tb[2];
     const char *port_name;
     int pin;
-    
+
     blobmsg_parse(ubus_method_policy, ARRAY_SIZE(ubus_method_policy), tb, blob_data(msg), blob_len(msg));
-    if (!tb[0] || !tb[1]) {
+    if (!tb[0] || !tb[1])
+    {
         return UBUS_STATUS_INVALID_ARGUMENT;
     }
-    
+
     port_name = blobmsg_get_string(tb[0]);
     pin = blobmsg_get_u32(tb[1]);
-    
-    if (send_command_to_device(port_name, "off", pin) < 0) {
+
+    if (send_command_to_device(port_name, "off", pin) < 0)
+    {
         blobmsg_add_string(&b, "error", "Failed to send OFF command");
-    } else {
+    }
+    else
+    {
         blobmsg_add_string(&b, "result", "Successfully sent OFF command");
     }
 
     ubus_send_reply(ctx, req, b.head);
     return 0;
 }
-
