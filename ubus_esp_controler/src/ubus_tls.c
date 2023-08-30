@@ -78,7 +78,7 @@ static int ubus_method_devices(struct ubus_context *ctx, struct ubus_object *obj
                 blobmsg_add_string(&b, "port", dev[count].port);
                 blobmsg_add_string(&b, "product id", dev[count].pid);
                 blobmsg_add_string(&b, "vendor id", dev[count].vid);
-                
+
                 blobmsg_close_table(&b, table);
                 count++;
             }
@@ -121,6 +121,18 @@ static int ubus_method_on(struct ubus_context *ctx, struct ubus_object *obj,
     port_name = blobmsg_get_string(tb[0]);
     pin = blobmsg_get_u32(tb[1]);
 
+    if (pin < 0 || pin > 16 ||
+        pin != 0 && pin != 2 &&
+        pin != 4 && pin != 5 &&
+        pin != 12 && pin != 13 &&
+        pin != 14 && pin != 15 &&
+        pin != 16)
+    {
+        blobmsg_add_string(&b, "error", "Invalid pin number");
+        ubus_send_reply(ctx, req, b.head);
+        return 0;
+    }
+
     if (send_command_to_device(port_name, "on", pin) < 0)
     {
         blobmsg_add_string(&b, "error", "Failed to send ON command");
@@ -150,6 +162,18 @@ static int ubus_method_off(struct ubus_context *ctx, struct ubus_object *obj,
 
     port_name = blobmsg_get_string(tb[0]);
     pin = blobmsg_get_u32(tb[1]);
+
+    if (pin < 0 || pin > 16 ||
+        pin != 0 && pin != 2 &&
+        pin != 4 && pin != 5 &&
+        pin != 12 && pin != 13 &&
+        pin != 14 && pin != 15 &&
+        pin != 16)
+    {
+        blobmsg_add_string(&b, "error", "Invalid pin number");
+        ubus_send_reply(ctx, req, b.head);
+        return 0;
+    }
 
     if (send_command_to_device(port_name, "off", pin) < 0)
     {
