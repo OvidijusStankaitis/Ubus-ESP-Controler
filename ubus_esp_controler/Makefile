@@ -19,8 +19,10 @@ endef
 define Package/ubus_esp_controler/install
 	$(INSTALL_DIR) $(1)/usr/bin
 	$(INSTALL_DIR) $(1)/etc/init.d
+	$(INSTALL_DIR) $(1)/etc/rc.d
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/ubus_esp_controler $(1)/usr/bin
 	$(INSTALL_BIN) ./scripts/startup.init $(1)/etc/init.d/ubus_esp_controler
+	$(INSTALL_BIN) ./scripts/startup.init $(1)/etc/rc.d/ubus_esp_controler
 endef
 
 
