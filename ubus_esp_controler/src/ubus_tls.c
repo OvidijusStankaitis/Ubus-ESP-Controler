@@ -3,7 +3,7 @@
 #include <libubox/blobmsg_json.h>
 #include <libubox/blobmsg.h>
 
-struct blob_buf b;
+struct blob_buf b, success, error;
 
 static int ubus_method_devices(struct ubus_context *ctx, struct ubus_object *obj,
                                struct ubus_request_data *req, const char *method,
@@ -34,6 +34,11 @@ struct ubus_object device_object = {
 void init_ubus_methods(struct ubus_context *ctx)
 {
     ubus_add_object(ctx, &device_object);
+    blob_buf_init(&success, 0);
+    blobmsg_add_string(&success, "result", "Successfully sent the command");
+    blob_buf_init(&error, 0);
+    blobmsg_add_string(&error, "error", "Failed to send the command");
+
 }
 
 static int ubus_method_devices(struct ubus_context *ctx, struct ubus_object *obj,
@@ -123,26 +128,23 @@ static int ubus_method_on(struct ubus_context *ctx, struct ubus_object *obj,
 
     if (pin < 0 || pin > 16 ||
         pin != 0 && pin != 2 &&
-        pin != 4 && pin != 5 &&
-        pin != 12 && pin != 13 &&
-        pin != 14 && pin != 15 &&
-        pin != 16)
+            pin != 4 && pin != 5 &&
+            pin != 12 && pin != 13 &&
+            pin != 14 && pin != 15 &&
+            pin != 16)
     {
-        blobmsg_add_string(&b, "error", "Invalid pin number");
-        ubus_send_reply(ctx, req, b.head);
-        return 0;
+        return UBUS_STATUS_INVALID_ARGUMENT;
     }
 
     if (send_command_to_device(port_name, "on", pin) < 0)
     {
-        blobmsg_add_string(&b, "error", "Failed to send ON command");
+        ubus_send_reply(ctx, req, error.head);
     }
     else
     {
-        blobmsg_add_string(&b, "result", "Successfully sent ON command");
+        ubus_send_reply(ctx, req, success.head);
     }
 
-    ubus_send_reply(ctx, req, b.head);
     return 0;
 }
 
@@ -165,25 +167,22 @@ static int ubus_method_off(struct ubus_context *ctx, struct ubus_object *obj,
 
     if (pin < 0 || pin > 16 ||
         pin != 0 && pin != 2 &&
-        pin != 4 && pin != 5 &&
-        pin != 12 && pin != 13 &&
-        pin != 14 && pin != 15 &&
-        pin != 16)
+            pin != 4 && pin != 5 &&
+            pin != 12 && pin != 13 &&
+            pin != 14 && pin != 15 &&
+            pin != 16)
     {
-        blobmsg_add_string(&b, "error", "Invalid pin number");
-        ubus_send_reply(ctx, req, b.head);
-        return 0;
+        return UBUS_STATUS_INVALID_ARGUMENT;
     }
 
     if (send_command_to_device(port_name, "off", pin) < 0)
     {
-        blobmsg_add_string(&b, "error", "Failed to send OFF command");
+        ubus_send_reply(ctx, req, error.head);
     }
     else
     {
-        blobmsg_add_string(&b, "result", "Successfully sent OFF command");
+        ubus_send_reply(ctx, req, success.head);
     }
 
-    ubus_send_reply(ctx, req, b.head);
     return 0;
 }
